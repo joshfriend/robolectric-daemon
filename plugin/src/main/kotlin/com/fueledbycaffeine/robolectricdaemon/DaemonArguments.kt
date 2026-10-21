@@ -49,14 +49,6 @@ internal class DaemonArguments(
     arguments.forEachIndexed { index, value ->
       properties.setProperty("${Launch.ARGUMENT_PREFIX}$index", value)
     }
-    test.allJvmArgs
-      .filter { it.startsWith("-D") }
-      .forEach {
-        properties.setProperty(
-          "${Launch.PROPERTY_PREFIX}${it.substring(2).substringBefore('=')}",
-          it.substringAfter('=', ""),
-        )
-      }
     test.environment.forEach { (key, value) ->
       properties.setProperty("${Launch.ENVIRONMENT_PREFIX}$key", value.toString())
     }

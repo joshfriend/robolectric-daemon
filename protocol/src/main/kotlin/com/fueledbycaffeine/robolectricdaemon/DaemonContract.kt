@@ -26,7 +26,6 @@ object DaemonContract {
     const val WORKING_DIRECTORY = "workingDirectory"
     const val ARGUMENT_COUNT = "argumentCount"
     const val ARGUMENT_PREFIX = "argument."
-    const val PROPERTY_PREFIX = "property."
     const val ENVIRONMENT_PREFIX = "environment."
     const val ENVIRONMENT_IDENTITY = "environmentIdentity"
   }

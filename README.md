@@ -40,6 +40,9 @@ Keep using JUnit 4 and Robolectric dependencies as usual.
 - Project class changes reload project classes. Dependency, resource, or Robolectric-instrumented
   class changes rebuild the warm runtime in the same worker process. Runtime artifact or JVM launch
   changes restart the worker.
+- Workers receive the system properties of Gradle's test JVM, including ones other plugins add in
+  their own `doFirst` actions. Changes to `roborazzi.*` properties apply to the next run without
+  restarting the worker; other property changes restart it.
 - Gradle still handles test filters, reports, lifecycle callbacks, and up-to-date and build-cache
   checks. Each non-cached run starts a disposable test JVM for discovery and result forwarding.
 - `-Probolectric.daemon=false` disables workers. Workers are disabled by default when the `CI`

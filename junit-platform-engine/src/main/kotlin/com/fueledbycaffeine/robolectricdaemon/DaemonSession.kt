@@ -5,6 +5,7 @@ import com.fueledbycaffeine.robolectricdaemon.DaemonContract.Launch
 import com.fueledbycaffeine.robolectricdaemon.DaemonContract.Request
 import com.fueledbycaffeine.robolectricdaemon.DaemonContract.Worker
 import java.io.File
+import java.lang.management.ManagementFactory
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -29,7 +30,7 @@ internal class DaemonSession(config: Properties) {
     List(launch.getProperty(Launch.ARGUMENT_COUNT).toInt()) {
       launch.getProperty("${Launch.ARGUMENT_PREFIX}$it")
     }
-  private val properties = prefixed(Launch.PROPERTY_PREFIX)
+  private val properties = gradleSystemProperties()
   private val startup = properties.filterKeys { !it.startsWith("roborazzi.") }.toSortedMap()
   private val environment = prefixed(Launch.ENVIRONMENT_PREFIX)
   private val java = launch.getProperty(Launch.JAVA)
@@ -138,6 +139,19 @@ internal class DaemonSession(config: Properties) {
       .filter { it.startsWith(prefix) }
       .associate { it.removePrefix(prefix) to launch.getProperty(it) }
 }
+
+/**
+ * The `-D` properties Gradle launched this JVM with. Reading them here, rather than from the Test
+ * task, includes properties other plugins add in their own `doFirst` actions (e.g. Roborazzi's
+ * verify mode), whatever order those actions run in.
+ */
+internal fun gradleSystemProperties(
+  arguments: List<String> = ManagementFactory.getRuntimeMXBean().inputArguments
+): Map<String, String> =
+  arguments
+    .filter { it.startsWith("-D") }
+    .associate { it.substring(2).substringBefore('=') to it.substringAfter('=', "") }
+    .filterKeys { !it.startsWith("org.gradle.") && !it.startsWith("robolectric.daemon.") }
 
 fun workerDirectories(taskDirectory: Path): List<Path> {
   if (!Files.isDirectory(taskDirectory)) return emptyList()

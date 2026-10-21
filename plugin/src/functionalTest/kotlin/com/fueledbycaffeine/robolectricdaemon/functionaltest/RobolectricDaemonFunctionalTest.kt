@@ -667,6 +667,103 @@ class RobolectricDaemonFunctionalTest {
   }
 
   @Test
+  fun `system properties set by later doFirst actions reach warm workers`() {
+    val project = DaemonProject().build()
+    // Registered before the daemon's own action, so it runs after it, as Roborazzi's does.
+    project
+      .file("lib/build.gradle")
+      .appendText(
+        """
+
+        def lateMode = providers.gradleProperty('mode').orElse('record')
+        tasks.withType(Test).configureEach {
+          doFirst {
+            it.systemProperty('late.prop', 'yes')
+            it.systemProperty('roborazzi.test.record', lateMode.get() == 'record')
+            it.systemProperty('roborazzi.test.verify', lateMode.get() == 'verify')
+            it.systemProperty('roborazzi.output.dir', 'build/late-output')
+          }
+        }
+        """
+          .trimIndent()
+      )
+    project
+      .file("lib/src/test/kotlin/com/example/lib/LatePropertyTest.kt")
+      .writeText(
+        """
+        package com.example.lib
+
+        import java.io.File
+        import org.junit.Assert.assertEquals
+        import org.junit.Assert.assertTrue
+        import org.junit.Test
+        import org.junit.runner.RunWith
+        import org.robolectric.RobolectricTestRunner
+        import org.robolectric.annotation.Config
+
+        @RunWith(RobolectricTestRunner::class)
+        @Config(sdk = [34])
+        class LatePropertyTest {
+          @Test
+          fun late() {
+            assertEquals("yes", System.getProperty("late.prop"))
+            assertEquals("build/late-output", System.getProperty("roborazzi.output.dir"))
+            val record = System.getProperty("roborazzi.test.record").toBoolean()
+            val verify = System.getProperty("roborazzi.test.verify").toBoolean()
+            assertTrue(record xor verify)
+            val output = File(System.getProperty("roborazzi.output.dir"), "revision.txt")
+            if (record) {
+              output.parentFile.mkdirs()
+              output.writeText(Revision.value().toString())
+            }
+            if (verify) {
+              assertEquals("recorded revision", output.readText(), Revision.value().toString())
+            }
+          }
+        }
+        """
+          .trimIndent()
+      )
+    val filter = "com.example.lib.LatePropertyTest"
+    try {
+      val record = project.build(test, "--tests", filter, "--rerun")
+      assertWithMessage(record.output).that(record.output).contains("1 tests, 0 failed")
+      val output = project.file("lib/build/late-output/revision.txt")
+      assertThat(output.readText()).isEqualTo("1")
+      val identity = project.file("$STATE/worker-1/identity.txt").readText()
+      assertWithMessage(identity).that(identity).contains("property late.prop=yes")
+      assertWithMessage(identity).that(identity).doesNotContain("roborazzi.")
+      assertWithMessage(identity).that(identity).doesNotContain("org.gradle.")
+      assertWithMessage(identity).that(identity).doesNotContain("robolectric.daemon.")
+
+      // Neither a rerun nor a different roborazzi.* mode restarts the worker.
+      val verify = project.build(test, "--tests", filter, "--rerun", "-Pmode=verify")
+      assertWithMessage(verify.output).that(verify.output).contains("1 tests, 0 failed")
+      assertWithMessage(verify.output).that(verify.output).doesNotContain("Restarting")
+      assertThat(verify.workerPids).isEqualTo(record.workerPids)
+      assertThat(output.readText()).isEqualTo("1")
+
+      // A mismatch must fail verification, not silently pass or overwrite the recording.
+      output.writeText("different")
+      val failed = project.buildAndFail(test, "--tests", filter, "--rerun", "-Pmode=verify")
+      assertWithMessage(failed.output).that(failed.output).contains("1 tests, 1 failed")
+      assertWithMessage(failed.output).that(failed.output).doesNotContain("Restarting")
+      assertThat(failed.workerPids).isEqualTo(record.workerPids)
+      assertThat(output.readText()).isEqualTo("different")
+      assertThat(
+          project
+            .file(
+              "lib/build/test-results/testDebugUnitTest/TEST-com.example.lib.LatePropertyTest.xml"
+            )
+            .readText()
+        )
+        .contains("recorded revision")
+    } finally {
+      project.build(":lib:stopRobolectricDaemon")
+    }
+  }
+
+  @Test
   fun `clean stops orphaned workers`() {
     val project = DaemonProject().build()
     val pids = project.build(test).workerPids

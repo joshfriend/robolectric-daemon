@@ -1,0 +1,25 @@
+pluginManagement {
+  repositories {
+    gradlePluginPortal()
+    mavenCentral()
+  }
+}
+
+dependencyResolutionManagement {
+  repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
+  repositories {
+    google()
+    mavenCentral()
+  }
+}
+
+// detekt rules for Gradle plugin code, from the sibling checkout.
+includeBuild("../detekt-gradle-rules")
+
+rootProject.name = "robolectric-daemon"
+
+include(":junit-platform-engine")
+include(":plugin")
+include(":protocol")
+include(":sandbox")
+include(":worker")

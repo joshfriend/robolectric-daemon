@@ -1,0 +1,40 @@
+[versions]
+# Gradle's embedded Kotlin, so the plugin runs on the stdlib Gradle provides.
+kotlin = "2.4.10"
+# AGP API compiled against: the oldest supported AGP.
+agp = "9.3.0"
+# Robolectric API the sandbox classes compile against; they only use APIs unchanged since 4.11.
+robolectric = "4.17"
+detekt = "2.0.0-alpha.6"
+junit4 = "4.13.2"
+junit = "5.14.4"
+truth = "1.4.5"
+testkit = "0.19"
+testkit-support = "0.27"
+protobuf = "4.33.0"
+
+[libraries]
+agp-api = { module = "com.android.tools.build:gradle-api", version.ref = "agp" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectric-sandbox = { module = "org.robolectric:sandbox", version.ref = "robolectric" }
+robolectric-pluginapi = { module = "org.robolectric:pluginapi", version.ref = "robolectric" }
+robolectric-shadowapi = { module = "org.robolectric:shadowapi", version.ref = "robolectric" }
+# The ASM Robolectric already puts on the sandbox's class path; only core APIs from ASM 9.
+asm = { module = "org.ow2.asm:asm", version = "9.8" }
+javax-inject = { module = "javax.inject:javax.inject", version = "1" }
+junit4 = { module = "junit:junit", version.ref = "junit4" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+truth = { module = "com.google.truth:truth", version.ref = "truth" }
+detekt-gradle-rules = { module = "com.fueledbycaffeine:detekt-gradle-rules", version = "0.1.0-SNAPSHOT" }
+protobuf = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+testkit = { id = "com.autonomousapps.testkit", version.ref = "testkit" }
+ktfmt = { id = "com.ncorti.ktfmt.gradle", version = "0.27.0" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
+protobuf = { id = "com.google.protobuf", version = "0.9.5" }
+shadow = { id = "com.gradleup.shadow", version = "9.2.2" }
+buildconfig = { id = "com.github.gmazzo.buildconfig", version = "6.1.2" }

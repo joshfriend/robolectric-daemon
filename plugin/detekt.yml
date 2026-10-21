@@ -1,0 +1,15 @@
+# Builds on detekt's defaults; the functional test is a scripted scenario with backticked names.
+naming:
+  FunctionNaming:
+    excludes: ['**/functionalTest/**']
+complexity:
+  LongMethod:
+    excludes: ['**/functionalTest/**']
+style:
+  UnnecessaryFullyQualifiedName:
+    active: true
+  MagicNumber:
+    excludes: ['**/functionalTest/**']
+gradle:
+  LazyPropertyMigration:
+    active: false

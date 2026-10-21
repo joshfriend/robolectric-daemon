@@ -1,0 +1,85 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.plugin.devel.tasks.ValidatePlugins
+
+plugins {
+  id("java-gradle-plugin")
+  id("maven-publish")
+  alias(libs.plugins.kotlin.jvm)
+  alias(libs.plugins.testkit)
+  alias(libs.plugins.ktfmt)
+  alias(libs.plugins.detekt)
+  alias(libs.plugins.buildconfig)
+}
+
+group = "com.fueledbycaffeine.robolectricdaemon"
+
+version = providers.gradleProperty("VERSION_NAME").get()
+
+ktfmt { googleStyle() }
+
+kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_17 } }
+
+tasks.withType(JavaCompile).configureEach { options.release = 17 }
+
+detekt {
+  buildUponDefaultConfig = true
+  config.from(file("detekt.yml"))
+}
+
+dependencies {
+  implementation(project(":junit-platform-engine"))
+  implementation("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
+  compileOnly(libs.agp.api)
+  detektPlugins(libs.detekt.gradle.rules)
+
+  functionalTestImplementation(project(":protocol"))
+  functionalTestImplementation(platform(libs.junit.bom))
+  functionalTestImplementation(libs.junit.jupiter)
+  functionalTestImplementation(libs.truth)
+  functionalTestRuntimeOnly(libs.junit.launcher)
+}
+
+buildConfig {
+  packageName("com.fueledbycaffeine.robolectricdaemon")
+  className("BuildConfig")
+  useKotlinOutput { internalVisibility = true }
+  buildConfigField(String, "GROUP", project.group.toString())
+  buildConfigField(String, "VERSION", project.version.toString())
+}
+
+gradlePlugin {
+  plugins {
+    create("robolectricDaemon") {
+      id = "com.fueledbycaffeine.robolectric-daemon"
+      implementationClass = "com.fueledbycaffeine.robolectricdaemon.RobolectricDaemonPlugin"
+      displayName = "Robolectric daemon"
+      description = "Runs Android unit tests in persistent, warm Robolectric worker JVMs"
+    }
+  }
+}
+
+gradleTestKitSupport {
+  withSupportLibrary(libs.versions.testkit.support.get())
+  withTruthLibrary()
+}
+
+tasks.named("functionalTest") {
+  dependsOn(":worker:installForFunctionalTest", ":sandbox:installForFunctionalTest", ":protocol:installForFunctionalTest", ":junit-platform-engine:installForFunctionalTest")
+}
+
+tasks.withType(ValidatePlugins).configureEach { enableStricterValidation.set(true) }
+
+// Fixture builds run on the oldest JDK Gradle 9 supports, so the worker is tested there too.
+def fixtureJava = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+
+tasks.withType(Test).configureEach {
+  useJUnitPlatform()
+  def fixtureJavaHome = fixtureJava.map { it.metadata.installationPath.asFile.absolutePath }
+  jvmArgumentProviders.add(
+    { -> ["-DfixtureJavaHome=${fixtureJavaHome.get()}".toString()] } as CommandLineArgumentProvider
+  )
+  systemProperty("gradleVersion", System.getProperty("gradleVersion") ?: "")
+  systemProperty("agpVersion", System.getProperty("agpVersion") ?: libs.versions.agp.get())
+  systemProperty("robolectricVersion", libs.versions.robolectric.get())
+  systemProperty("runtimeBuildRoot", rootProject.projectDir.absolutePath)
+}

@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package robolectric.daemon;
+option java_package = "com.fueledbycaffeine.robolectricdaemon.messages";
+option java_outer_classname = "WorkerMessages";
+
+message Empty {}
+
+// One socket carries a control operation or an execution session.
+message ClientMessage {
+  reserved 4;
+  reserved "discover";
+  string token = 1;
+  oneof payload {
+    Empty ping = 2;
+    Empty stop = 3;
+    RunRequest run = 5;
+    ClassGroup class_group = 6;
+  }
+}
+
+message RunRequest {
+  reserved 7, 8;
+  reserved "command_line_includes", "excludes";
+  string resource_key = 1;
+  string mirror_id = 2;
+  repeated string classpath = 3;
+  repeated string project_entries = 4;
+  map<string, string> system_properties = 5;
+  repeated string includes = 6;
+}
+
+// An empty group marks the end of the shared scheduling queue.
+message ClassGroup {
+  repeated string classes = 1;
+}
+
+message WorkerEvent {
+  reserved 3 to 9;
+  reserved "discovered", "owner", "started", "finished", "ignored", "failed", "skipped";
+  oneof payload {
+    Empty acknowledged = 1;
+    Empty next = 2;
+    string stdout = 10;
+    string stderr = 11;
+    Completed completed = 12;
+    TestEvent test = 13;
+  }
+}
+
+// JUnit Platform lifecycle events, identified by Vintage unique ID rather than method name.
+message TestEvent {
+  enum Kind {
+    REGISTERED = 0;
+    STARTED = 1;
+    FINISHED = 2;
+    SKIPPED = 3;
+  }
+  enum Status {
+    SUCCESSFUL = 0;
+    FAILED = 1;
+    ABORTED = 2;
+  }
+  string unique_id = 1;
+  Kind kind = 2;
+  Status status = 3;
+  TestFailure failure = 4;
+  string reason = 5;
+  // Descriptor metadata for dynamically registered tests.
+  string parent_id = 6;
+  string display_name = 7;
+  string descriptor_type = 8;
+  string class_name = 9;
+  string method = 10;
+  string legacy_name = 11;
+}
+
+message TestFailure {
+  reserved 1;
+  reserved "test";
+  bool assertion = 2;
+  optional string expected = 3;
+  optional string actual = 4;
+  // Outer exception first. Cyclic causes are truncated by the producer.
+  repeated RemoteThrowable causes = 5;
+  // The Java-serialized exception, with its real types, causes and suppressed exceptions. Absent
+  // when it can't be serialized; the client falls back to the fields above when it can't be read.
+  optional bytes serialized = 6;
+}
+
+message RemoteThrowable {
+  string type = 1;
+  optional string message = 2;
+  repeated StackFrame frames = 3;
+}
+
+message StackFrame {
+  string class_name = 1;
+  string method = 2;
+  optional string file = 3;
+  int32 line = 4;
+}
+
+message Completed {
+  int32 tests = 1;
+  int32 failures = 2;
+  string error = 3;
+  string summary = 4;
+}

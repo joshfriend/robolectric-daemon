@@ -9,6 +9,7 @@ import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.workerPids
 import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.write
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import org.gradle.testkit.runner.BuildResult
 import org.junit.jupiter.api.Test
 
 class SandboxFunctionalTest {
@@ -149,6 +150,82 @@ class SandboxFunctionalTest {
     } finally {
       project.build(":lib:stopRobolectricDaemon")
       binder.parentFile.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `one warm worker serves several SDKs and switches between them without stale classes`() {
+    // The newest SDKs the fixture's Java 17 runs, plus an older one.
+    val sdks = listOf(30, 33, 34, 35)
+    val project = DaemonProject().build()
+    project
+      .file("lib/src/test/kotlin/com/example/lib/SdkTests.kt")
+      .writeText(
+        """
+        package com.example.lib
+
+        import android.os.Build
+        import java.io.File
+        import org.junit.Assert.assertEquals
+        import org.junit.Assert.assertSame
+        import org.junit.Test
+        import org.junit.runner.RunWith
+        import org.robolectric.RobolectricTestRunner
+        import org.robolectric.RuntimeEnvironment
+        import org.robolectric.annotation.Config
+
+        object SdkRecorder {
+          fun record() {
+            assertEquals(RuntimeEnvironment.getApiLevel(), Build.VERSION.SDK_INT)
+            assertSame(Revision::class.java.classLoader, Thread.currentThread().contextClassLoader)
+            File("build/sdk").mkdirs()
+            File("build/sdk/${'$'}{Build.VERSION.SDK_INT}.txt").writeText("${'$'}{Revision.value()}")
+          }
+        }
+
+        @RunWith(RobolectricTestRunner::class)
+        @Config(sdk = [${sdks.joinToString()}])
+        class MultiSdkTest {
+          @Test fun record() = SdkRecorder.record()
+        }
+        ${sdks.joinToString("\n") { sdk ->
+          "@RunWith(RobolectricTestRunner::class) @Config(sdk = [$sdk]) " +
+            "class Sdk${sdk}Test { @Test fun record() = SdkRecorder.record() }"
+        }}
+        """
+          .trimIndent()
+      )
+    val records = project.file("lib/build/sdk")
+    fun run(testClass: String, tests: Int): BuildResult {
+      records.deleteRecursively()
+      val result = project.build(test, "--tests", "com.example.lib.$testClass")
+      assertWithMessage(result.output).that(result.output).contains("$tests tests, 0 failed")
+      return result
+    }
+    fun revisions(): Map<String, String> =
+      checkNotNull(records.listFiles()).associate { it.nameWithoutExtension to it.readText() }
+
+    try {
+      val cold = run("MultiSdkTest", tests = sdks.size)
+      assertWithMessage(cold.output).that(cold.output).contains("reload=full(new-worker)")
+      assertThat(revisions()).isEqualTo(sdks.associate { "$it" to "1" })
+      assertThat(cold.workerPids).hasSize(1)
+
+      // Each edit is seen by the SDK sandbox that runs next, even after idling for several epochs.
+      val runs = listOf(35, 30, 33, 34).map { listOf(it) } + listOf(sdks)
+      for ((index, run) in runs.withIndex()) {
+        val revision = index + 2
+        project.write(PRODUCTION, production(revision))
+        val testClass = run.singleOrNull()?.let { "Sdk${it}Test" } ?: "MultiSdkTest"
+        val warm = run(testClass, tests = run.size)
+        assertWithMessage(warm.output).that(warm.output).contains("reload=project")
+        assertWithMessage(warm.output).that(warm.output).doesNotContain("reload=full")
+        assertWithMessage(warm.output).that(warm.output).doesNotContain("Restarting")
+        assertThat(warm.workerPids).isEqualTo(cold.workerPids)
+        assertThat(revisions()).isEqualTo(run.associate { "$it" to "$revision" })
+      }
+    } finally {
+      project.build(":lib:stopRobolectricDaemon")
     }
   }
 }

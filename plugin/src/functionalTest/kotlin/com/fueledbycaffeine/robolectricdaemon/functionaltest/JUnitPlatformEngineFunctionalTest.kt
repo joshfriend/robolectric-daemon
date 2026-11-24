@@ -1,11 +1,15 @@
 package com.fueledbycaffeine.robolectricdaemon.functionaltest
 
+import com.fueledbycaffeine.robolectricdaemon.DaemonContract
 import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.DaemonProject
+import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.DaemonProject.Companion.PRODUCTION
 import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.DaemonProject.Companion.STATE
+import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.DaemonProject.Companion.production
 import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.build
 import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.buildAndFail
 import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.file
 import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.workerPids
+import com.fueledbycaffeine.robolectricdaemon.functionaltest.fixtures.write
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.jupiter.api.Test
@@ -278,6 +282,106 @@ class JUnitPlatformEngineFunctionalTest {
         .appendText("\ntasks.withType(Test).configureEach { forkEvery = 1 }\n")
       val local = project.build(test, "--tests", "*ExampleTest")
       assertWithMessage(local.output).that(local.output).doesNotContain("Robolectric worker:")
+    } finally {
+      project.build(":lib:stopRobolectricDaemon")
+    }
+  }
+
+  @Test
+  fun `available workers drain the queue within one project epoch`() {
+    val project = DaemonProject().build()
+    project
+      .file("lib/src/test/kotlin/com/example/lib/QueueTest.kt")
+      .writeText(
+        """
+        package com.example.lib
+
+        import java.io.File
+        import org.junit.Assert.assertEquals
+        import org.junit.Assert.assertNull
+        import org.junit.Assert.assertTrue
+        import org.junit.Test
+
+        object QueueState {
+          var pid: Long? = null
+
+          fun await(name: String) {
+            val file = File("build/" + name)
+            val deadline = System.nanoTime() + 20_000_000_000L
+            while (!file.exists() && System.nanoTime() < deadline) {
+              Thread.sleep(20)
+            }
+            assertTrue("Timed out waiting for " + name, file.exists())
+          }
+        }
+
+        class AQueueTest {
+          @Test(timeout = 30_000)
+          fun waitsForQueuedClass() {
+            assertNull(QueueState.pid)
+            File("build/queue-started").writeText("started")
+            QueueState.await("queue-completed")
+          }
+        }
+
+        class BQueueTest {
+          @Test
+          fun setsProjectState() {
+            assertNull(QueueState.pid)
+            QueueState.pid = ProcessHandle.current().pid()
+          }
+        }
+
+        class CQueueTest {
+          @Test(timeout = 30_000)
+          fun runsOnAvailableWorker() {
+            QueueState.await("queue-started")
+            assertEquals(ProcessHandle.current().pid(), QueueState.pid)
+            File("build/queue-completed").writeText("completed")
+          }
+
+          class Nested {
+            @Test
+            fun staysWithTopLevelClass() {
+              assertEquals(ProcessHandle.current().pid(), QueueState.pid)
+            }
+          }
+        }
+        """
+          .trimIndent()
+      )
+    try {
+      // Equal unknown durations would pre-partition A+C together, stranding C behind A.
+      val cold = project.build(test, "-Pforks=2", "--tests", "*QueueTest*")
+      assertWithMessage(cold.output).that(cold.output).contains("4 tests, 0 failed")
+      assertThat(cold.workerPids).hasSize(2)
+      assertThat(cold.output).contains("request=1 base=1 epoch=1 reload=full(new-worker)")
+      assertThat(Regex("request=1 base=1 epoch=1").findAll(cold.output).count()).isEqualTo(2)
+
+      project.file("lib/build/queue-started").delete()
+      project.file("lib/build/queue-completed").delete()
+      // Stale, equal timings must not strand C on the blocked worker on a warm run either.
+      project
+        .file("$STATE/${DaemonContract.DURATIONS_FILE}")
+        .writeText(
+          """
+          com.example.lib.AQueueTest=100
+          com.example.lib.BQueueTest=100
+          com.example.lib.CQueueTest=100
+          """
+            .trimIndent()
+        )
+      project.write(PRODUCTION, production(1, member = "val queueRevision = 2"))
+      val warm = project.build(test, "-Pforks=2", "--tests", "*QueueTest*")
+      assertWithMessage(warm.output).that(warm.output).contains("4 tests, 0 failed")
+      assertThat(warm.workerPids).isEqualTo(cold.workerPids)
+      assertThat(warm.output).contains("request=2 base=1 epoch=2 reload=project")
+      assertThat(Regex("request=2 base=1 epoch=2").findAll(warm.output).count()).isEqualTo(2)
+      for (name in listOf("AQueueTest", "BQueueTest", "CQueueTest", "CQueueTest${'$'}Nested")) {
+        val report =
+          project.file("lib/build/test-results/testDebugUnitTest/TEST-com.example.lib.$name.xml")
+        assertThat(report.readText()).contains("tests=\"1\"")
+      }
     } finally {
       project.build(":lib:stopRobolectricDaemon")
     }

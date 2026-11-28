@@ -13,8 +13,12 @@ dependencyResolutionManagement {
   }
 }
 
-// detekt rules for Gradle plugin code, from the sibling checkout.
-includeBuild("../detekt-gradle-rules")
+// Detekt rules are available only when the sibling checkout is present.
+if (file("../detekt-gradle-rules").isDirectory()) {
+  includeBuild("../detekt-gradle-rules")
+} else {
+  logger.warn("Detekt Gradle rules checkout not found; Detekt tasks require ../detekt-gradle-rules.")
+}
 
 rootProject.name = "robolectric-daemon"
 

@@ -1,0 +1,45 @@
+name: Functional Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: functionalTest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  functionalTest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        gradle_version:
+          - '9.9.3'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Functional tests
+        run: env -u CI ./gradlew :plugin:functionalTest -DgradleVersion=${{ matrix.gradle_version }}
+
+  functionalTest-results:
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    name: Functional Tests Results
+    needs: [functionalTest]
+    steps:
+      - run: |
+          result="${{ needs.functionalTest.result }}"
+          if [[ $result == "success" || $result == "skipped" ]]; then
+            exit 0
+          else
+            exit 1
+          fi

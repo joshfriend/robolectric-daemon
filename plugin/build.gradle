@@ -69,15 +69,8 @@ tasks.named("functionalTest") {
 
 tasks.withType(ValidatePlugins).configureEach { enableStricterValidation.set(true) }
 
-// Fixture builds run on the oldest JDK Gradle 9 supports, so the worker is tested there too.
-def fixtureJava = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
-
 tasks.withType(Test).configureEach {
   useJUnitPlatform()
-  def fixtureJavaHome = fixtureJava.map { it.metadata.installationPath.asFile.absolutePath }
-  jvmArgumentProviders.add(
-    { -> ["-DfixtureJavaHome=${fixtureJavaHome.get()}".toString()] } as CommandLineArgumentProvider
-  )
   systemProperty("gradleVersion", System.getProperty("gradleVersion") ?: "")
   systemProperty("agpVersion", System.getProperty("agpVersion") ?: libs.versions.agp.get())
   systemProperty("robolectricVersion", libs.versions.robolectric.get())

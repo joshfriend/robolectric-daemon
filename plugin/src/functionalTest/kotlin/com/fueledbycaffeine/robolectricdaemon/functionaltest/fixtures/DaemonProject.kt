@@ -40,7 +40,7 @@ class DaemonProject : AbstractGradleProject() {
             "org.gradle.parallel=true",
             "org.gradle.configuration-cache=true",
             "android.useAndroidX=true",
-            "org.gradle.java.home=${System.getProperty("fixtureJavaHome")}",
+            "org.gradle.java.home=${System.getProperty("java.home")}",
           )
         withSettingsScript { plugins(Plugin("com.android.library", agpVersion, apply = false)) }
         withFile("local.properties", "sdk.dir=${androidHome()}")

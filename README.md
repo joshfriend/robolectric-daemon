@@ -232,13 +232,16 @@ Then add `mavenLocal()` to both repository blocks in the consuming build.
 
 ## Development
 
+Local builds require a full JDK 25 installation, including `jlink`. Gradle selects it using the
+daemon toolchain criteria.
+
 ```sh
 ./gradlew ktfmtFormat
 ./gradlew build :plugin:detektMain :plugin:detektFunctionalTest
 ```
 
-The build includes plugin validation and functional tests. Detekt uses the sibling
-`../detekt-gradle-rules` included build.
+The build includes plugin validation and functional tests. Detekt tasks require the sibling
+`../detekt-gradle-rules` checkout; other tasks can run without it.
 
 The implementation is split across five projects:
 

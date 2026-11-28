@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
   id("java-library")
-  id("maven-publish")
+  alias(libs.plugins.maven.publish)
   alias(libs.plugins.kotlin.jvm)
   alias(libs.plugins.ktfmt)
   alias(libs.plugins.testkit)
@@ -12,6 +12,8 @@ plugins {
 
 group = "com.fueledbycaffeine.robolectricdaemon"
 version = providers.gradleProperty("VERSION_NAME").get()
+
+apply from: rootProject.file("gradle/publishing.gradle")
 
 ktfmt { googleStyle() }
 kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_11 } }
@@ -61,9 +63,3 @@ tasks.shadowJar {
 shadow { addShadowVariantIntoJavaComponent = false }
 
 tasks.test { useJUnitPlatform() }
-
-publishing {
-  publications {
-    mavenJava(MavenPublication) { from components.java }
-  }
-}

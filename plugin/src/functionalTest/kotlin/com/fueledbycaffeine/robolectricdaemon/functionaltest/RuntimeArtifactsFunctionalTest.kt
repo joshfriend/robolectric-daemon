@@ -29,9 +29,8 @@ class RuntimeArtifactsFunctionalTest {
     val root = File(System.getProperty("runtimeBuildRoot"))
     for (module in listOf("worker", "protocol")) {
       val jar =
-        checkNotNull(root.resolve("$module/build/libs").listFiles()).single {
-          it.name.startsWith("$module-") && it.extension == "jar"
-        }
+        root.resolve("$module/build/libs/$module-${System.getProperty("runtimeVersion")}.jar")
+      check(jar.isFile)
       jar.copyTo(runtime.resolve("$module.jar"))
     }
     project

@@ -2,12 +2,14 @@
 // supplied alongside the sandbox so remote execution uses the same JUnit version as discovery.
 plugins {
   id("java-library")
-  id("maven-publish")
+  alias(libs.plugins.maven.publish)
   alias(libs.plugins.testkit)
 }
 
 group = "com.fueledbycaffeine.robolectricdaemon"
 version = providers.gradleProperty("VERSION_NAME").get()
+
+apply from: rootProject.file("gradle/publishing.gradle")
 
 tasks.withType(JavaCompile).configureEach { options.release = 11 }
 
@@ -23,10 +25,4 @@ dependencies {
   implementation(platform(libs.junit.bom))
   implementation(libs.junit.launcher)
   implementation("org.junit.vintage:junit-vintage-engine")
-}
-
-publishing {
-  publications {
-    mavenJava(MavenPublication) { from components.java }
-  }
 }

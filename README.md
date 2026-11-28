@@ -222,6 +222,14 @@ The plugin and its runtime artifacts are released together with the same version
 to add the release repository to both `pluginManagement.repositories` and
 `dependencyResolutionManagement.repositories`; the plugin does not add repositories.
 
+Snapshots are published to Maven Central after the `Test and Check` workflow succeeds on `main`.
+To release, set `VERSION_NAME` to a non-snapshot version and push the matching `v<version>` tag,
+or run the Publish workflow for that tag. Releases are published to Maven Central and, after
+Maven Central succeeds, the Gradle Plugin Portal. Publishing requires the GitHub Actions secrets
+`MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `SIGNING_SECRET_KEY`,
+`SIGNING_SECRET_KEY_ID`, `GRADLE_PUBLISH_KEY`, and `GRADLE_PUBLISH_SECRET`.
+If the signing key is password-protected, also set `SIGNING_SECRET_KEY_PASSWORD`.
+
 To publish locally, run:
 
 ```sh

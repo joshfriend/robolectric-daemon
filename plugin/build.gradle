@@ -3,7 +3,8 @@ import org.gradle.plugin.devel.tasks.ValidatePlugins
 
 plugins {
   id("java-gradle-plugin")
-  id("maven-publish")
+  alias(libs.plugins.plugin.publish)
+  alias(libs.plugins.maven.publish)
   alias(libs.plugins.kotlin.jvm)
   alias(libs.plugins.testkit)
   alias(libs.plugins.ktfmt)
@@ -14,6 +15,8 @@ plugins {
 group = "com.fueledbycaffeine.robolectricdaemon"
 
 version = providers.gradleProperty("VERSION_NAME").get()
+
+apply from: rootProject.file("gradle/publishing.gradle")
 
 ktfmt { googleStyle() }
 
@@ -48,12 +51,15 @@ buildConfig {
 }
 
 gradlePlugin {
+  vcsUrl = "https://github.com/joshfriend/robolectric-daemon"
+  website = "https://github.com/joshfriend/robolectric-daemon"
   plugins {
     create("robolectricDaemon") {
       id = "com.fueledbycaffeine.robolectric-daemon"
       implementationClass = "com.fueledbycaffeine.robolectricdaemon.RobolectricDaemonPlugin"
       displayName = "Robolectric daemon"
       description = "Runs Android unit tests in persistent, warm Robolectric worker JVMs"
+      tags = ["android", "testing", "robolectric"]
     }
   }
 }
@@ -75,4 +81,5 @@ tasks.withType(Test).configureEach {
   systemProperty("agpVersion", System.getProperty("agpVersion") ?: libs.versions.agp.get())
   systemProperty("robolectricVersion", libs.versions.robolectric.get())
   systemProperty("runtimeBuildRoot", rootProject.projectDir.absolutePath)
+  systemProperty("runtimeVersion", project.version.toString())
 }

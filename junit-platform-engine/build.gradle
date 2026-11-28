@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
   id("java-library")
-  id("maven-publish")
+  alias(libs.plugins.maven.publish)
   alias(libs.plugins.kotlin.jvm)
   alias(libs.plugins.testkit)
   alias(libs.plugins.ktfmt)
@@ -10,6 +10,8 @@ plugins {
 
 group = "com.fueledbycaffeine.robolectricdaemon"
 version = providers.gradleProperty("VERSION_NAME").get()
+
+apply from: rootProject.file("gradle/publishing.gradle")
 
 ktfmt { googleStyle() }
 kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_17 } }
@@ -27,9 +29,3 @@ dependencies {
 }
 
 tasks.test { useJUnitPlatform { includeEngines("junit-jupiter") } }
-
-publishing {
-  publications {
-    mavenJava(MavenPublication) { from components.java }
-  }
-}

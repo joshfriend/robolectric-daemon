@@ -1,0 +1,32 @@
+mavenPublishing {
+  publishToMavenCentral(true)
+  if (providers.gradleProperty("signingInMemoryKey").isPresent()) {
+    signAllPublications()
+  }
+
+  pom {
+    name = "Robolectric daemon ${project.name}"
+    description = "Persistent Robolectric workers for Android unit tests"
+    inceptionYear = "2026"
+    url = "https://github.com/joshfriend/robolectric-daemon/"
+    licenses {
+      license {
+        name = "MIT License"
+        url = "https://opensource.org/license/mit"
+        distribution = "repo"
+      }
+    }
+    developers {
+      developer {
+        id = "joshfriend"
+        name = "Josh Friend"
+        url = "https://github.com/joshfriend/"
+      }
+    }
+    scm {
+      url = "https://github.com/joshfriend/robolectric-daemon/"
+      connection = "scm:git:git://github.com/joshfriend/robolectric-daemon.git"
+      developerConnection = "scm:git:ssh://git@github.com/joshfriend/robolectric-daemon.git"
+    }
+  }
+}

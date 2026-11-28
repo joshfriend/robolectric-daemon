@@ -66,6 +66,7 @@ class WorkerClientTest {
   }
 
   private fun command(): List<String> {
+    val temporary = Files.createDirectories(directory.resolve("worker-tmp"))
     val classpath =
       listOf(
           WorkerLaunchProbe::class.java,
@@ -79,6 +80,7 @@ class WorkerClientTest {
         .joinToString(File.pathSeparator)
     return listOf(
       Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+      "-Djava.io.tmpdir=$temporary",
       "-cp",
       classpath,
       WorkerLaunchProbe::class.java.name,

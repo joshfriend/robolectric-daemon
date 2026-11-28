@@ -1,3 +1,7 @@
+tasks.withType(Javadoc).configureEach {
+  options.addBooleanOption("Xdoclint:all,-missing", true)
+}
+
 mavenPublishing {
   publishToMavenCentral(true)
   if (providers.gradleProperty("signingInMemoryKey").isPresent()) {
